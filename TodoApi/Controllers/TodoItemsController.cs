@@ -23,18 +23,20 @@ namespace TodoApi.Controllers
 
         // GET: api/TodoItems
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<TodoItem>>> GetTodoItems()
+        public async Task<ActionResult<IEnumerable<ToDoItemDTO>>> GetTodoItems()
         {
           if (_context.TodoItems == null)
           {
               return NotFound();
           }
-            return await _context.TodoItems.ToListAsync();
+            return await _context.TodoItems
+                .Select(x => ItemToDTO(x))
+                .ToListAsync();
         }
 
         // GET: api/TodoItems/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<TodoItem>> GetTodoItem(long id)
+        public async Task<ActionResult<ToDoItemDTO>> GetTodoItem(long id)
         {
           if (_context.TodoItems == null)
           {
@@ -47,37 +49,37 @@ namespace TodoApi.Controllers
                 return NotFound();
             }
 
-            return todoItem;
+         return ItemToDTO(todoItem);
         }
 
         // PUT: api/TodoItems/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutTodoItem(long id, TodoItem todoItem)
+        public async Task<IActionResult> PutTodoItem(long id, ToDoItemDTO todoItemDTO)
         {
-            if (id != todoItem.Id)
+            if (id != todoItemDTO.Id)
             {
                 return BadRequest();
             }
 
-            _context.Entry(todoItem).State = EntityState.Modified;
+            var todoItem = await _context.TodoItems.FindAsync(id);
+
+            if(todoItem == null)
+            {
+                return NotFound();
+            }
+            todoItem.Name = todoItemDTO.Name;
+            todoItem.IsComplete = todoItemDTO.IsComplete;
 
             try
             {
                 await _context.SaveChangesAsync();
             }
-            catch (DbUpdateConcurrencyException)
+             
+            catch(DbUpdateConcurrencyException) when (TodoItemExists(id))
             {
-                if (!TodoItemExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
+                return NotFound();
             }
-
             return NoContent();
         }
 
@@ -120,5 +122,13 @@ namespace TodoApi.Controllers
         {
             return (_context.TodoItems?.Any(e => e.Id == id)).GetValueOrDefault();
         }
+
+        private static ToDoItemDTO ItemToDTO(TodoItem todoItem) =>
+            new ToDoItemDTO
+            {
+                Id = todoItem.Id,
+                IsComplete = todoItem.IsComplete,
+                Name = todoItem.Name,
+            };
     }
 }
